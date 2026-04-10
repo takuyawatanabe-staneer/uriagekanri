@@ -7,272 +7,481 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; background: #0f172a; color: #e2e8f0; }
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 h1 { text-align: center; font-size: 1.8rem; margin-bottom: 8px; color: #38bdf8; }
-.subtitle { text-align: center; color: #64748b; margin-bottom: 24px; font-size: 0.9rem; }
-.loading { text-align: center; padding: 100px 20px; font-size: 1.2rem; color: #64748b; }
-.loading .spinner { display: inline-block; width: 40px; height: 40px; border: 3px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+.subtitle { text-align: center; color: #64748b; margin-bottom: 20px; font-size: 0.9rem; }
+
+/* Navigation */
+.nav { display: flex; justify-content: center; gap: 8px; margin-bottom: 24px; }
+.nav-btn { padding: 10px 24px; border-radius: 8px; cursor: pointer; background: #1e293b; color: #94a3b8; border: 1px solid #334155; font-size: 0.95rem; transition: all 0.2s; }
+.nav-btn:hover { background: #334155; }
+.nav-btn.active { background: #38bdf8; color: #0f172a; font-weight: bold; border-color: #38bdf8; }
+
+/* Loading */
+.loading { text-align: center; padding: 80px 20px; font-size: 1.1rem; color: #64748b; }
+.spinner { display: inline-block; width: 36px; height: 36px; border: 3px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.error { text-align: center; padding: 100px 20px; color: #f87171; }
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.kpi-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
-.kpi-card .label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; }
-.kpi-card .value { font-size: 1.6rem; font-weight: bold; }
-.kpi-card .value.blue { color: #38bdf8; }
-.kpi-card .value.green { color: #4ade80; }
-.kpi-card .value.purple { color: #a78bfa; }
-.kpi-card .value.orange { color: #fb923c; }
-.chart-container { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #334155; }
-.chart-container h2 { font-size: 1.1rem; margin-bottom: 16px; color: #cbd5e1; }
-.chart-wrapper { position: relative; height: 350px; }
-.detail-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
-.detail-table th, .detail-table td { padding: 8px 12px; text-align: right; border-bottom: 1px solid #334155; }
-.detail-table th { color: #94a3b8; font-weight: normal; text-align: left; position: sticky; top: 0; background: #1e293b; }
-.detail-table td:first-child, .detail-table th:first-child { text-align: left; position: sticky; left: 0; background: #1e293b; z-index: 1; }
-.detail-table tr:hover td { background: #253349; }
-.table-scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; background: #334155; color: #94a3b8; border: none; font-size: 0.85rem; }
-.tab.active { background: #38bdf8; color: #0f172a; font-weight: bold; }
-.section { margin-bottom: 32px; }
-#dashboard { display: none; }
+.error { text-align: center; padding: 80px 20px; color: #f87171; }
+
+/* KPI Cards */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi-card { background: #1e293b; border-radius: 10px; padding: 16px; border: 1px solid #334155; }
+.kpi-card .label { font-size: 0.75rem; color: #94a3b8; margin-bottom: 4px; }
+.kpi-card .value { font-size: 1.4rem; font-weight: bold; }
+.blue { color: #38bdf8; } .green { color: #4ade80; } .purple { color: #a78bfa; } .orange { color: #fb923c; }
+
+/* Chart */
+.chart-box { background: #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 20px; border: 1px solid #334155; }
+.chart-box h2 { font-size: 1rem; margin-bottom: 12px; color: #cbd5e1; }
+.chart-wrap { position: relative; height: 300px; }
+
+/* Editable Table */
+.table-box { background: #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 20px; border: 1px solid #334155; }
+.table-box h2 { font-size: 1rem; margin-bottom: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 12px; }
+.table-scroll { overflow-x: auto; }
+.data-table { border-collapse: collapse; font-size: 0.8rem; white-space: nowrap; }
+.data-table th, .data-table td { padding: 6px 10px; border-bottom: 1px solid #334155; text-align: right; }
+.data-table th { color: #94a3b8; font-weight: normal; position: sticky; top: 0; background: #1e293b; z-index: 2; }
+.data-table .row-header { text-align: left; position: sticky; left: 0; background: #1e293b; z-index: 1; min-width: 180px; font-weight: 500; }
+.data-table th.row-header { z-index: 3; }
+.data-table tr:hover td { background: #253349; }
+.data-table tr.summary-row { border-top: 2px solid #475569; font-weight: bold; }
+.data-table tr.summary-row td { color: #38bdf8; }
+.data-table tr.profit-row td { color: #4ade80; }
+.data-table tr.profit-row td.negative { color: #f87171; }
+
+/* Editable cell */
+.editable { cursor: pointer; position: relative; }
+.editable:hover { background: #334155 !important; }
+.cell-input { width: 80px; background: #0f172a; color: #e2e8f0; border: 1px solid #38bdf8; border-radius: 4px; padding: 3px 6px; font-size: 0.8rem; text-align: right; outline: none; }
+
+/* Save button */
+.save-btn { padding: 6px 16px; border-radius: 6px; cursor: pointer; background: #4ade80; color: #0f172a; border: none; font-size: 0.85rem; font-weight: bold; transition: all 0.2s; }
+.save-btn:hover { background: #22c55e; }
+.save-btn:disabled { background: #334155; color: #64748b; cursor: default; }
+.save-indicator { font-size: 0.85rem; color: #4ade80; margin-left: 8px; }
+
+/* 成約Data table */
+.seiyaku-table { border-collapse: collapse; font-size: 0.78rem; white-space: nowrap; width: 100%; }
+.seiyaku-table th, .seiyaku-table td { padding: 6px 8px; border-bottom: 1px solid #334155; text-align: left; }
+.seiyaku-table th { color: #94a3b8; font-weight: normal; position: sticky; top: 0; background: #1e293b; z-index: 2; }
+.seiyaku-table tr:hover td { background: #253349; }
+.seiyaku-table .cell-input { width: 100px; text-align: left; }
+.seiyaku-editable { cursor: pointer; }
+.seiyaku-editable:hover { background: #334155 !important; }
+
+/* Page sections */
+.page { display: none; }
+.page.active { display: block; }
 </style>
 </head>
 <body>
-<h1>売上管理ダッシュボード</h1>
-<p class="subtitle">データソース: Google Sheets（売上計画） | 最終更新: <span id="updateTime"></span></p>
+<div class="container">
+  <h1>売上管理ダッシュボード</h1>
+  <p class="subtitle">最終更新: <span id="updateTime">-</span></p>
 
-<div id="loadingState" class="loading">
-  <div class="spinner"></div>
-  <div>データを読み込み中...</div>
-</div>
-<div id="errorState" class="error" style="display:none"></div>
+  <div class="nav">
+    <button class="nav-btn active" onclick="switchPage('sales')">売上計画</button>
+    <button class="nav-btn" onclick="switchPage('seiyaku')">成約Data</button>
+  </div>
 
-<div id="dashboard">
-  <div class="kpi-grid" id="kpiGrid"></div>
+  <div id="loadingState" class="loading"><div class="spinner"></div><div>データを読み込み中...</div></div>
+  <div id="errorState" class="error" style="display:none"></div>
 
-  <div class="section">
-    <div class="chart-container">
-      <h2>入社売上合計（確定+ヨミ） - 月次推移</h2>
-      <div class="chart-wrapper"><canvas id="salesChart"></canvas></div>
+  <!-- 売上計画ページ -->
+  <div id="page-sales" class="page">
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="chart-box">
+      <h2>月次推移チャート</h2>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
     </div>
-    <div class="chart-container">
-      <h2>入社売上 詳細（担当者別）</h2>
-      <div class="tabs" id="salesTabs"></div>
-      <div class="table-scroll" id="salesDetail"></div>
+
+    <div class="table-box">
+      <h2>
+        売上計画（2025/08 〜 2026/08）
+        <button class="save-btn" id="saveSalesBtn" disabled onclick="saveSalesChanges()">変更を保存</button>
+        <span class="save-indicator" id="saveIndicator" style="display:none"></span>
+      </h2>
+      <div class="table-scroll" id="salesTable"></div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="chart-container">
-      <h2>入金合計（税込） - 月次推移</h2>
-      <div class="chart-wrapper"><canvas id="paymentChart"></canvas></div>
-    </div>
-    <div class="chart-container">
-      <h2>入金 詳細（担当者別）</h2>
-      <div class="tabs" id="paymentTabs"></div>
-      <div class="table-scroll" id="paymentDetail"></div>
+  <!-- 成約Dataページ -->
+  <div id="page-seiyaku" class="page">
+    <div class="table-box">
+      <h2>
+        成約Data
+        <button class="save-btn" id="saveSeiyakuBtn" disabled onclick="saveSeiyakuChanges()">変更を保存</button>
+        <span class="save-indicator" id="saveSeiyakuIndicator" style="display:none"></span>
+      </h2>
+      <div class="table-scroll" style="max-height: 80vh; overflow-y: auto;" id="seiyakuTable"></div>
     </div>
   </div>
 </div>
 
 <script>
-async function init() {
+let salesState = null;
+let seiyakuState = null;
+let pendingSalesUpdates = {};  // key: "row-colIdx" => value
+let pendingSeiyakuUpdates = {}; // key: "row-col" => value
+
+const fmt = v => {
+  if (v === 0) return '¥0';
+  const abs = Math.abs(Math.round(v));
+  const s = '¥' + abs.toLocaleString('ja-JP');
+  return v < 0 ? '-' + s : s;
+};
+
+// ============ Navigation ============
+function switchPage(page) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('page-' + page).classList.add('active');
+}
+
+// ============ Data Loading ============
+async function loadData() {
   try {
-    const res = await fetch('/api/sheets');
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    const D = await res.json();
-    if (D.error) throw new Error(D.error);
+    const res = await fetch('/api/sheets?action=all');
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    salesState = data.sales;
+    seiyakuState = data.seiyaku;
 
     document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
     document.getElementById('updateTime').textContent = new Date().toLocaleString('ja-JP');
+    document.getElementById('page-sales').classList.add('active');
 
-    renderDashboard(D);
+    renderSalesPage();
+    renderSeiyakuPage();
   } catch (e) {
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('errorState').style.display = 'block';
-    document.getElementById('errorState').textContent = 'データ取得エラー: ' + e.message;
+    document.getElementById('errorState').textContent = 'エラー: ' + e.message;
   }
 }
 
-function renderDashboard(D) {
-  const fmt = v => v === 0 ? '¥0' : '¥' + Math.round(v).toLocaleString('ja-JP');
+// ============ Sales Page ============
+function renderSalesPage() {
+  const { months, rows } = salesState;
 
+  // KPI: find current month
   const now = new Date();
-  const currentMonthStr = now.getFullYear() + '/' + String(now.getMonth() + 1).padStart(2, '0');
-  const currentIdx = D.months.indexOf(currentMonthStr);
-  const prevIdx = currentIdx > 0 ? currentIdx - 1 : 0;
+  const curStr = now.getFullYear() + '/' + String(now.getMonth() + 1).padStart(2, '0');
+  const curIdx = months.indexOf(curStr);
 
-  function findLastNonZero(arr) {
-    for (let i = (arr || []).length - 1; i >= 0; i--) if (arr[i] !== 0) return i;
-    return -1;
-  }
+  // Find totals row
+  const totalRow = rows.find(r => r.label === '入社売上合計(確定+ヨミ)');
+  const payRow = rows.find(r => r.label === '入金合計(確定)※税込');
+  const profitRow = rows.find(r => r.label === '残利益');
 
-  const salesLastIdx = Math.max(findLastNonZero(D['入社売上合計']), currentIdx >= 0 ? currentIdx + 6 : 30);
-  const payLastIdx = Math.max(findLastNonZero(D['入金合計_確定_税込']), findLastNonZero(D['入金合計_確定ヨミ_税込']), currentIdx >= 0 ? currentIdx + 6 : 30);
-  const displayEnd = Math.min(Math.max(salesLastIdx, payLastIdx) + 1, D.months.length);
-  const displayStart = Math.max(0, displayEnd - 24);
+  const curSales = curIdx >= 0 && totalRow ? totalRow.values[curIdx] : 0;
+  const curPay = curIdx >= 0 && payRow ? payRow.values[curIdx] : 0;
+  const curProfit = curIdx >= 0 && profitRow ? profitRow.values[curIdx] : 0;
 
-  const months = D.months.slice(displayStart, displayEnd);
-  const slice = arr => (arr || []).slice(displayStart, displayEnd);
-
-  // KPI
-  const salesTotal = slice(D['入社売上合計']);
-  const payTotal = slice(D['入金合計_確定_税込']);
-  const payTotalYomi = slice(D['入金合計_確定ヨミ_税込']);
-
-  const ci = currentIdx >= displayStart ? currentIdx - displayStart : -1;
-  const pi = prevIdx >= displayStart ? prevIdx - displayStart : -1;
-  const curSales = ci >= 0 ? (salesTotal[ci] || 0) : 0;
-  const prevSales = pi >= 0 ? (salesTotal[pi] || 0) : 0;
-  const curPay = ci >= 0 ? (payTotal[ci] || 0) : 0;
-  const curPayYomi = ci >= 0 ? (payTotalYomi[ci] || 0) : 0;
-
-  const fyStart = D.months.findIndex(m => {
-    const y = parseInt(m.split('/')[0]);
-    const mo = parseInt(m.split('/')[1]);
-    return (mo === 4 && y === (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1));
-  });
-  let fySalesSum = 0, fyPaySum = 0;
-  if (fyStart >= 0 && currentIdx >= fyStart) {
-    for (let i = fyStart; i <= currentIdx; i++) {
-      fySalesSum += (D['入社売上合計'][i] || 0);
-      fyPaySum += (D['入金合計_確定_税込'][i] || 0);
-    }
-  }
+  // Cumulative from 2025/08
+  const cumSales = totalRow ? totalRow.values.slice(0, curIdx >= 0 ? curIdx + 1 : 0).reduce((a, b) => a + b, 0) : 0;
+  const cumPay = payRow ? payRow.values.slice(0, curIdx >= 0 ? curIdx + 1 : 0).reduce((a, b) => a + b, 0) : 0;
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi-card"><div class="label">今月 入社売上合計</div><div class="value blue">${fmt(curSales)}</div></div>
-    <div class="kpi-card"><div class="label">前月 入社売上合計</div><div class="value blue">${fmt(prevSales)}</div></div>
     <div class="kpi-card"><div class="label">今月 入金合計(確定)</div><div class="value green">${fmt(curPay)}</div></div>
-    <div class="kpi-card"><div class="label">今月 入金合計(確定+ヨミ)</div><div class="value purple">${fmt(curPayYomi)}</div></div>
-    <div class="kpi-card"><div class="label">今期累計 入社売上</div><div class="value orange">${fmt(fySalesSum)}</div></div>
-    <div class="kpi-card"><div class="label">今期累計 入金(確定)</div><div class="value green">${fmt(fyPaySum)}</div></div>
+    <div class="kpi-card"><div class="label">今月 残利益</div><div class="value ${curProfit >= 0 ? 'green' : 'orange'}">${fmt(curProfit)}</div></div>
+    <div class="kpi-card"><div class="label">期間累計 入社売上</div><div class="value blue">${fmt(cumSales)}</div></div>
+    <div class="kpi-card"><div class="label">期間累計 入金</div><div class="value purple">${fmt(cumPay)}</div></div>
   `;
 
-  // Sales Chart
-  new Chart(document.getElementById('salesChart'), {
-    type: 'bar',
-    data: {
-      labels: months,
-      datasets: [{
-        label: '入社売上合計(確定+ヨミ)',
-        data: salesTotal,
-        backgroundColor: 'rgba(56,189,248,0.6)',
-        borderColor: '#38bdf8',
-        borderWidth: 1,
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: '#94a3b8' } },
-        tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } }
-      },
-      scales: {
-        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1e293b' } },
-        y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: '#334155' } }
-      }
-    }
-  });
-
-  // Payment Chart
-  new Chart(document.getElementById('paymentChart'), {
+  // Chart
+  const chartCtx = document.getElementById('mainChart');
+  if (window._mainChart) window._mainChart.destroy();
+  window._mainChart = new Chart(chartCtx, {
     type: 'bar',
     data: {
       labels: months,
       datasets: [
         {
-          label: '入金合計(確定)税込',
-          data: payTotal,
-          backgroundColor: 'rgba(74,222,128,0.6)',
-          borderColor: '#4ade80',
+          label: '入社売上合計',
+          data: totalRow ? totalRow.values : [],
+          backgroundColor: 'rgba(56,189,248,0.5)',
+          borderColor: '#38bdf8',
           borderWidth: 1,
-          borderRadius: 4,
+          borderRadius: 3,
+          order: 2,
         },
         {
-          label: '入金合計(確定+ヨミ)税込',
-          data: payTotalYomi,
-          backgroundColor: 'rgba(167,139,250,0.3)',
-          borderColor: '#a78bfa',
+          label: '入金合計(確定)',
+          data: payRow ? payRow.values : [],
+          backgroundColor: 'rgba(74,222,128,0.5)',
+          borderColor: '#4ade80',
           borderWidth: 1,
-          borderRadius: 4,
-        }
-      ]
+          borderRadius: 3,
+          order: 2,
+        },
+        {
+          label: '残利益',
+          data: profitRow ? profitRow.values : [],
+          type: 'line',
+          borderColor: '#fb923c',
+          backgroundColor: 'rgba(251,146,60,0.1)',
+          pointRadius: 3,
+          fill: false,
+          tension: 0.3,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { color: '#94a3b8' } },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+        legend: { labels: { color: '#94a3b8', usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } },
       },
       scales: {
-        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1e293b' } },
-        y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: '#334155' } }
-      }
-    }
+        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: 'rgba(51,65,85,0.5)' } },
+        y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: 'rgba(51,65,85,0.5)' } },
+      },
+    },
   });
 
-  // Detail Tables
-  function renderTable(containerId, tabsId, sections) {
-    const tabsEl = document.getElementById(tabsId);
-    const containerEl = document.getElementById(containerId);
-
-    function render(idx) {
-      const sec = sections[idx];
-      tabsEl.innerHTML = sections.map((s, i) =>
-        `<button class="tab ${i === idx ? 'active' : ''}" data-tab="${containerId}" data-idx="${i}">${s.name}</button>`
-      ).join('');
-
-      tabsEl.querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', () => render(parseInt(btn.dataset.idx)));
-      });
-
-      let html = '<table class="detail-table"><thead><tr><th>担当者</th>';
-      months.forEach(m => html += `<th>${m}</th>`);
-      html += '<th>合計</th></tr></thead><tbody>';
-
-      const entries = Object.entries(sec.data);
-      entries.forEach(([person, vals]) => {
-        const sliced = slice(vals);
-        const total = sliced.reduce((a, b) => a + b, 0);
-        html += `<tr><td>${person}</td>`;
-        sliced.forEach(v => html += `<td>${fmt(v)}</td>`);
-        html += `<td style="font-weight:bold">${fmt(total)}</td></tr>`;
-      });
-
-      if (entries.length > 1) {
-        html += '<tr style="border-top:2px solid #64748b;font-weight:bold"><td>合計</td>';
-        for (let i = 0; i < months.length; i++) {
-          const sum = entries.reduce((s, [, vals]) => s + (slice(vals)[i] || 0), 0);
-          html += `<td>${fmt(sum)}</td>`;
-        }
-        const grandTotal = entries.reduce((s, [, vals]) => s + slice(vals).reduce((a, b) => a + b, 0), 0);
-        html += `<td>${fmt(grandTotal)}</td></tr>`;
-      }
-
-      html += '</tbody></table>';
-      containerEl.innerHTML = html;
-    }
-
-    render(0);
-  }
-
-  renderTable('salesDetail', 'salesTabs', [
-    { name: '確定', data: D['入社売上_確定'] },
-    { name: 'ヨミ', data: D['入社売上_ヨミ'] },
-  ]);
-
-  renderTable('paymentDetail', 'paymentTabs', [
-    { name: '確定(税込)', data: D['入金_確定_税込'] },
-    { name: 'ヨミ(税込)', data: D['入金_ヨミ_税込'] },
-    { name: 'その他', data: D['その他_入金'] },
-  ]);
+  // Editable table
+  renderSalesTable();
 }
 
-init();
+function renderSalesTable() {
+  const { months, rows } = salesState;
+  let html = '<table class="data-table"><thead><tr><th class="row-header">項目</th>';
+  months.forEach(m => html += `<th>${m}</th>`);
+  html += '<th>合計</th></tr></thead><tbody>';
+
+  // Group rows for visual sections
+  const sections = [
+    { title: '【入社売上】', indices: [0, 1, 2, 3, 4] },
+    { title: '【成約金額】', indices: [5, 6] },
+    { title: '【入金(税抜)】', indices: [7, 8] },
+    { title: '【入金(税込)・その他】', indices: [9, 10, 11, 12, 13, 14] },
+    { title: '【損益】', indices: [15, 16] },
+  ];
+
+  sections.forEach(sec => {
+    html += `<tr><td class="row-header" colspan="${months.length + 2}" style="color:#64748b;font-size:0.75rem;padding-top:12px;">${sec.title}</td></tr>`;
+    sec.indices.forEach(idx => {
+      const r = rows[idx];
+      if (!r) return;
+      const isSummary = !r.editable && (r.label.includes('合計') || r.label === '残利益');
+      const isProfit = r.label === '残利益';
+      const trClass = isProfit ? 'profit-row' : (isSummary ? 'summary-row' : '');
+      const displayLabel = r.person ? `${r.label}（${r.person}）` : r.label;
+
+      html += `<tr class="${trClass}"><td class="row-header">${displayLabel}</td>`;
+      let total = 0;
+      r.values.forEach((v, ci) => {
+        total += v;
+        const key = `${r.sheetRow}-${ci}`;
+        const displayVal = pendingSalesUpdates[key] !== undefined ? pendingSalesUpdates[key] : v;
+        const isNeg = displayVal < 0;
+
+        if (r.editable) {
+          const changed = pendingSalesUpdates[key] !== undefined ? ' style="color:#facc15"' : '';
+          html += `<td class="editable" ondblclick="editSalesCell(this, ${r.sheetRow}, ${ci}, ${v})"${changed}>${fmt(displayVal)}</td>`;
+        } else {
+          html += `<td${isProfit && isNeg ? ' class="negative"' : ''}>${fmt(v)}</td>`;
+        }
+      });
+      html += `<td style="font-weight:bold">${fmt(total)}</td></tr>`;
+    });
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('salesTable').innerHTML = html;
+}
+
+function editSalesCell(td, sheetRow, colIdx, originalVal) {
+  if (td.querySelector('input')) return;
+  const key = `${sheetRow}-${colIdx}`;
+  const currentVal = pendingSalesUpdates[key] !== undefined ? pendingSalesUpdates[key] : originalVal;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'cell-input';
+  input.value = currentVal;
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  const finish = () => {
+    const newVal = Number(input.value) || 0;
+    if (newVal !== originalVal) {
+      pendingSalesUpdates[key] = newVal;
+      // Update salesState for display
+      const row = salesState.rows.find(r => r.sheetRow === sheetRow);
+      if (row) row.values[colIdx] = newVal;
+    } else {
+      delete pendingSalesUpdates[key];
+    }
+    document.getElementById('saveSalesBtn').disabled = Object.keys(pendingSalesUpdates).length === 0;
+    renderSalesTable();
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(); }
+    if (e.key === 'Escape') { delete pendingSalesUpdates[key]; renderSalesTable(); }
+  });
+}
+
+async function saveSalesChanges() {
+  const btn = document.getElementById('saveSalesBtn');
+  const indicator = document.getElementById('saveIndicator');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  const updates = Object.entries(pendingSalesUpdates).map(([key, value]) => {
+    const [row, colIdx] = key.split('-').map(Number);
+    return { sheet: '売上計画', row, col: salesState.colOffset + colIdx, value };
+  });
+
+  try {
+    const res = await fetch('/api/sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    });
+    const result = await res.json();
+    if (result.ok) {
+      pendingSalesUpdates = {};
+      indicator.textContent = '保存しました';
+      indicator.style.display = 'inline';
+      setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+      // Reload fresh data
+      const res2 = await fetch('/api/sheets?action=sales');
+      salesState = await res2.json();
+      renderSalesPage();
+    } else {
+      throw new Error(JSON.stringify(result));
+    }
+  } catch (e) {
+    alert('保存エラー: ' + e.message);
+  }
+  btn.textContent = '変更を保存';
+  btn.disabled = Object.keys(pendingSalesUpdates).length === 0;
+}
+
+// ============ 成約Data Page ============
+function renderSeiyakuPage() {
+  const { headers, rows } = seiyakuState;
+  if (!headers || headers.length === 0) {
+    document.getElementById('seiyakuTable').innerHTML = '<p style="color:#64748b">データがありません</p>';
+    return;
+  }
+
+  // Display columns (skip col 0 which is empty, and col 18 "集計用")
+  const displayCols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20];
+  const editableCols = [2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 19, 20]; // Editable columns
+
+  let html = '<table class="seiyaku-table"><thead><tr>';
+  displayCols.forEach(ci => {
+    html += `<th>${headers[ci] || ''}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(r => {
+    html += '<tr>';
+    displayCols.forEach(ci => {
+      const val = r.cells[ci] || '';
+      const key = `${r.sheetRow}-${ci}`;
+      const displayVal = pendingSeiyakuUpdates[key] !== undefined ? pendingSeiyakuUpdates[key] : val;
+      const changed = pendingSeiyakuUpdates[key] !== undefined ? ' style="color:#facc15"' : '';
+
+      if (editableCols.includes(ci)) {
+        html += `<td class="seiyaku-editable" ondblclick="editSeiyakuCell(this, ${r.sheetRow}, ${ci})"${changed}>${displayVal}</td>`;
+      } else {
+        html += `<td>${displayVal}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('seiyakuTable').innerHTML = html;
+}
+
+function editSeiyakuCell(td, sheetRow, col) {
+  if (td.querySelector('input')) return;
+  const key = `${sheetRow}-${col}`;
+  const currentVal = td.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'cell-input';
+  input.value = currentVal;
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  const finish = () => {
+    const newVal = input.value;
+    const origRow = seiyakuState.rows.find(r => r.sheetRow === sheetRow);
+    const origVal = origRow ? (origRow.cells[col] || '') : '';
+    if (newVal !== origVal) {
+      pendingSeiyakuUpdates[key] = newVal;
+    } else {
+      delete pendingSeiyakuUpdates[key];
+    }
+    document.getElementById('saveSeiyakuBtn').disabled = Object.keys(pendingSeiyakuUpdates).length === 0;
+    renderSeiyakuPage();
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(); }
+    if (e.key === 'Escape') { renderSeiyakuPage(); }
+  });
+}
+
+async function saveSeiyakuChanges() {
+  const btn = document.getElementById('saveSeiyakuBtn');
+  const indicator = document.getElementById('saveSeiyakuIndicator');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  const updates = Object.entries(pendingSeiyakuUpdates).map(([key, value]) => {
+    const [row, col] = key.split('-').map(Number);
+    return { sheet: '成約Data', row, col, value };
+  });
+
+  try {
+    const res = await fetch('/api/sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    });
+    const result = await res.json();
+    if (result.ok) {
+      pendingSeiyakuUpdates = {};
+      indicator.textContent = '保存しました';
+      indicator.style.display = 'inline';
+      setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+      // Reload
+      const res2 = await fetch('/api/sheets?action=seiyaku');
+      seiyakuState = await res2.json();
+      renderSeiyakuPage();
+    } else {
+      throw new Error(JSON.stringify(result));
+    }
+  } catch (e) {
+    alert('保存エラー: ' + e.message);
+  }
+  btn.textContent = '変更を保存';
+  btn.disabled = Object.keys(pendingSeiyakuUpdates).length === 0;
+}
+
+// ============ Init ============
+loadData();
 </script>
 </body>
 </html>
