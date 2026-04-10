@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>売上管理ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+h1 { text-align: center; font-size: 1.8rem; margin-bottom: 8px; color: #38bdf8; }
+.subtitle { text-align: center; color: #64748b; margin-bottom: 24px; font-size: 0.9rem; }
+.loading { text-align: center; padding: 100px 20px; font-size: 1.2rem; color: #64748b; }
+.loading .spinner { display: inline-block; width: 40px; height: 40px; border: 3px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { text-align: center; padding: 100px 20px; color: #f87171; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.kpi-card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; }
+.kpi-card .label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; }
+.kpi-card .value { font-size: 1.6rem; font-weight: bold; }
+.kpi-card .value.blue { color: #38bdf8; }
+.kpi-card .value.green { color: #4ade80; }
+.kpi-card .value.purple { color: #a78bfa; }
+.kpi-card .value.orange { color: #fb923c; }
+.chart-container { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 24px; border: 1px solid #334155; }
+.chart-container h2 { font-size: 1.1rem; margin-bottom: 16px; color: #cbd5e1; }
+.chart-wrapper { position: relative; height: 350px; }
+.detail-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+.detail-table th, .detail-table td { padding: 8px 12px; text-align: right; border-bottom: 1px solid #334155; }
+.detail-table th { color: #94a3b8; font-weight: normal; text-align: left; position: sticky; top: 0; background: #1e293b; }
+.detail-table td:first-child, .detail-table th:first-child { text-align: left; position: sticky; left: 0; background: #1e293b; z-index: 1; }
+.detail-table tr:hover td { background: #253349; }
+.table-scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; background: #334155; color: #94a3b8; border: none; font-size: 0.85rem; }
+.tab.active { background: #38bdf8; color: #0f172a; font-weight: bold; }
+.section { margin-bottom: 32px; }
+#dashboard { display: none; }
+</style>
+</head>
+<body>
+<h1>売上管理ダッシュボード</h1>
+<p class="subtitle">データソース: Google Sheets（売上計画） | 最終更新: <span id="updateTime"></span></p>
+
+<div id="loadingState" class="loading">
+  <div class="spinner"></div>
+  <div>データを読み込み中...</div>
+</div>
+<div id="errorState" class="error" style="display:none"></div>
+
+<div id="dashboard">
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="section">
+    <div class="chart-container">
+      <h2>入社売上合計（確定+ヨミ） - 月次推移</h2>
+      <div class="chart-wrapper"><canvas id="salesChart"></canvas></div>
+    </div>
+    <div class="chart-container">
+      <h2>入社売上 詳細（担当者別）</h2>
+      <div class="tabs" id="salesTabs"></div>
+      <div class="table-scroll" id="salesDetail"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="chart-container">
+      <h2>入金合計（税込） - 月次推移</h2>
+      <div class="chart-wrapper"><canvas id="paymentChart"></canvas></div>
+    </div>
+    <div class="chart-container">
+      <h2>入金 詳細（担当者別）</h2>
+      <div class="tabs" id="paymentTabs"></div>
+      <div class="table-scroll" id="paymentDetail"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function init() {
+  try {
+    const res = await fetch('/api/sheets');
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const D = await res.json();
+    if (D.error) throw new Error(D.error);
+
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('updateTime').textContent = new Date().toLocaleString('ja-JP');
+
+    renderDashboard(D);
+  } catch (e) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('errorState').style.display = 'block';
+    document.getElementById('errorState').textContent = 'データ取得エラー: ' + e.message;
+  }
+}
+
+function renderDashboard(D) {
+  const fmt = v => v === 0 ? '¥0' : '¥' + Math.round(v).toLocaleString('ja-JP');
+
+  const now = new Date();
+  const currentMonthStr = now.getFullYear() + '/' + String(now.getMonth() + 1).padStart(2, '0');
+  const currentIdx = D.months.indexOf(currentMonthStr);
+  const prevIdx = currentIdx > 0 ? currentIdx - 1 : 0;
+
+  function findLastNonZero(arr) {
+    for (let i = (arr || []).length - 1; i >= 0; i--) if (arr[i] !== 0) return i;
+    return -1;
+  }
+
+  const salesLastIdx = Math.max(findLastNonZero(D['入社売上合計']), currentIdx >= 0 ? currentIdx + 6 : 30);
+  const payLastIdx = Math.max(findLastNonZero(D['入金合計_確定_税込']), findLastNonZero(D['入金合計_確定ヨミ_税込']), currentIdx >= 0 ? currentIdx + 6 : 30);
+  const displayEnd = Math.min(Math.max(salesLastIdx, payLastIdx) + 1, D.months.length);
+  const displayStart = Math.max(0, displayEnd - 24);
+
+  const months = D.months.slice(displayStart, displayEnd);
+  const slice = arr => (arr || []).slice(displayStart, displayEnd);
+
+  // KPI
+  const salesTotal = slice(D['入社売上合計']);
+  const payTotal = slice(D['入金合計_確定_税込']);
+  const payTotalYomi = slice(D['入金合計_確定ヨミ_税込']);
+
+  const ci = currentIdx >= displayStart ? currentIdx - displayStart : -1;
+  const pi = prevIdx >= displayStart ? prevIdx - displayStart : -1;
+  const curSales = ci >= 0 ? (salesTotal[ci] || 0) : 0;
+  const prevSales = pi >= 0 ? (salesTotal[pi] || 0) : 0;
+  const curPay = ci >= 0 ? (payTotal[ci] || 0) : 0;
+  const curPayYomi = ci >= 0 ? (payTotalYomi[ci] || 0) : 0;
+
+  const fyStart = D.months.findIndex(m => {
+    const y = parseInt(m.split('/')[0]);
+    const mo = parseInt(m.split('/')[1]);
+    return (mo === 4 && y === (now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1));
+  });
+  let fySalesSum = 0, fyPaySum = 0;
+  if (fyStart >= 0 && currentIdx >= fyStart) {
+    for (let i = fyStart; i <= currentIdx; i++) {
+      fySalesSum += (D['入社売上合計'][i] || 0);
+      fyPaySum += (D['入金合計_確定_税込'][i] || 0);
+    }
+  }
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card"><div class="label">今月 入社売上合計</div><div class="value blue">${fmt(curSales)}</div></div>
+    <div class="kpi-card"><div class="label">前月 入社売上合計</div><div class="value blue">${fmt(prevSales)}</div></div>
+    <div class="kpi-card"><div class="label">今月 入金合計(確定)</div><div class="value green">${fmt(curPay)}</div></div>
+    <div class="kpi-card"><div class="label">今月 入金合計(確定+ヨミ)</div><div class="value purple">${fmt(curPayYomi)}</div></div>
+    <div class="kpi-card"><div class="label">今期累計 入社売上</div><div class="value orange">${fmt(fySalesSum)}</div></div>
+    <div class="kpi-card"><div class="label">今期累計 入金(確定)</div><div class="value green">${fmt(fyPaySum)}</div></div>
+  `;
+
+  // Sales Chart
+  new Chart(document.getElementById('salesChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: '入社売上合計(確定+ヨミ)',
+        data: salesTotal,
+        backgroundColor: 'rgba(56,189,248,0.6)',
+        borderColor: '#38bdf8',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8' } },
+        tooltip: { callbacks: { label: ctx => fmt(ctx.raw) } }
+      },
+      scales: {
+        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: '#334155' } }
+      }
+    }
+  });
+
+  // Payment Chart
+  new Chart(document.getElementById('paymentChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: '入金合計(確定)税込',
+          data: payTotal,
+          backgroundColor: 'rgba(74,222,128,0.6)',
+          borderColor: '#4ade80',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: '入金合計(確定+ヨミ)税込',
+          data: payTotalYomi,
+          backgroundColor: 'rgba(167,139,250,0.3)',
+          borderColor: '#a78bfa',
+          borderWidth: 1,
+          borderRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8' } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+      },
+      scales: {
+        x: { ticks: { color: '#64748b', maxRotation: 45 }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', callback: v => fmt(v) }, grid: { color: '#334155' } }
+      }
+    }
+  });
+
+  // Detail Tables
+  function renderTable(containerId, tabsId, sections) {
+    const tabsEl = document.getElementById(tabsId);
+    const containerEl = document.getElementById(containerId);
+
+    function render(idx) {
+      const sec = sections[idx];
+      tabsEl.innerHTML = sections.map((s, i) =>
+        `<button class="tab ${i === idx ? 'active' : ''}" data-tab="${containerId}" data-idx="${i}">${s.name}</button>`
+      ).join('');
+
+      tabsEl.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => render(parseInt(btn.dataset.idx)));
+      });
+
+      let html = '<table class="detail-table"><thead><tr><th>担当者</th>';
+      months.forEach(m => html += `<th>${m}</th>`);
+      html += '<th>合計</th></tr></thead><tbody>';
+
+      const entries = Object.entries(sec.data);
+      entries.forEach(([person, vals]) => {
+        const sliced = slice(vals);
+        const total = sliced.reduce((a, b) => a + b, 0);
+        html += `<tr><td>${person}</td>`;
+        sliced.forEach(v => html += `<td>${fmt(v)}</td>`);
+        html += `<td style="font-weight:bold">${fmt(total)}</td></tr>`;
+      });
+
+      if (entries.length > 1) {
+        html += '<tr style="border-top:2px solid #64748b;font-weight:bold"><td>合計</td>';
+        for (let i = 0; i < months.length; i++) {
+          const sum = entries.reduce((s, [, vals]) => s + (slice(vals)[i] || 0), 0);
+          html += `<td>${fmt(sum)}</td>`;
+        }
+        const grandTotal = entries.reduce((s, [, vals]) => s + slice(vals).reduce((a, b) => a + b, 0), 0);
+        html += `<td>${fmt(grandTotal)}</td></tr>`;
+      }
+
+      html += '</tbody></table>';
+      containerEl.innerHTML = html;
+    }
+
+    render(0);
+  }
+
+  renderTable('salesDetail', 'salesTabs', [
+    { name: '確定', data: D['入社売上_確定'] },
+    { name: 'ヨミ', data: D['入社売上_ヨミ'] },
+  ]);
+
+  renderTable('paymentDetail', 'paymentTabs', [
+    { name: '確定(税込)', data: D['入金_確定_税込'] },
+    { name: 'ヨミ(税込)', data: D['入金_ヨミ_税込'] },
+    { name: 'その他', data: D['その他_入金'] },
+  ]);
+}
+
+init();
+</script>
+</body>
+</html>
